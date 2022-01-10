@@ -5,9 +5,11 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 from sklearn.cluster import DBSCAN
 
 from config import OUTPUT_FILE, OUTPUT_LABEL_FOLDERS
+from src.utils import read_image
 
 logging.info("Loading encodings")
 data = pickle.loads(open(OUTPUT_FILE, "rb").read())
@@ -32,9 +34,10 @@ for label_id in label_ids:
     Path(f"{OUTPUT_LABEL_FOLDERS}/{label_id}").mkdir(parents=True, exist_ok=True)
 
 groups = df.groupby("label")
+progress_bar = tqdm(total=len(df))
 for label_id, group in groups:
     for j, row in group.iterrows():
-        image = cv2.imread(str(row["imagePath"]))
+        image = read_image(str(row["image_path"]))
         (top, right, bottom, left) = row["loc"]
         face = image[top:bottom, left:right]
 
@@ -43,3 +46,4 @@ for label_id, group in groups:
         file_path = f"{OUTPUT_LABEL_FOLDERS}/{label_id}/{j}.jpg"
 
         cv2.imwrite(filename=file_path, img=face)
+        progress_bar.update()
