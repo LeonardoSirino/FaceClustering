@@ -1,5 +1,7 @@
 # path to sample images
 /data
+/labels
+*.pickle
 
 
 # Byte-compiled / optimized / DLL files
