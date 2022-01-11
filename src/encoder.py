@@ -3,19 +3,19 @@ import hashlib
 from pathlib import Path
 from typing import List
 
-import pandas as pd
 import cv2
 import face_recognition
+import pandas as pd
+from tqdm import tqdm
 
-from .config import (DETECTION_METHOD, IMAGES_COUNT, IMAGES_FOLDER,
-                     OUTPUT_FILE, SUPPORTED_IMAGES_FORMATS)
-from .storage.controller import Controller, Locations, Image
+from .config import DETECTION_METHOD, SUPPORTED_IMAGES_FORMATS
+from .storage.controller import Controller, Image, Location
 from .utils import read_image
 
 
 class Encoder:
-    def __init__(self) -> None:
-        self.controller = Controller()
+    def __init__(self, controller: Controller) -> None:
+        self.controller = controller
 
     @staticmethod
     def get_images_paths(folder: str,
@@ -56,7 +56,7 @@ class Encoder:
         locations = []
         images = []
 
-        for _, row in new_images.iterrows():
+        for _, row in tqdm(new_images.iterrows(), total=len(new_images)):
             image = read_image(row['path'])
             rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             boxes = face_recognition.face_locations(
@@ -65,9 +65,9 @@ class Encoder:
             encodings = face_recognition.face_encodings(rgb, boxes)
 
             for (box, enc) in zip(boxes, encodings):
-                location = Locations(image_hash=row['hash'],
-                                     box=','.join(map(str, box)),
-                                     encoding=enc.tobytes())
+                location = Location(image_hash=row['hash'],
+                                    box=','.join(map(str, box)),
+                                    encoding=enc.tobytes())
                 locations.append(location)
 
             images.append(Image(hash=row['hash'], path=row['path']))
