@@ -2,6 +2,7 @@
 /data
 /labels
 *.pickle
+storage.db
 
 ### OpenCV ###
 #OpenCV for Mac and Linux
