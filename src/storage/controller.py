@@ -1,6 +1,7 @@
 import sqlite3 as sql
 from dataclasses import dataclass
 from typing import List, Optional
+from pprint import pprint
 
 
 @dataclass
@@ -14,8 +15,8 @@ class Location:
     image_hash: str
     box: str
     encoding: bytes
-    label_id: Optional[str] = None
-    _id: int = -1
+    label_id: Optional[int] = None
+    id_: int = -1
 
     def __repr__(self) -> str:
         return f'Location(image_hash={self.image_hash[:5]}, box={self.box}, encoding={len(self.encoding)} bytes, label_id={self.label_id})'
@@ -23,8 +24,8 @@ class Location:
 
 @dataclass
 class Labels:
-    name: str
-    _id: int = -1
+    name: str = ''
+    id_: int = -1
 
 
 class Controller:
@@ -42,7 +43,7 @@ class Controller:
 
         self.__cursor.execute("""CREATE TABLE IF NOT EXISTS labels
                             (
-                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                id INTEGER PRIMARY KEY NOT NULL,
                                 name TEXT
                             )""")
 
@@ -56,6 +57,12 @@ class Controller:
                                 FOREIGN KEY(label_id) REFERENCES labels(id),
                                 FOREIGN KEY(image_hash) REFERENCES images(hash)
                             )""")
+
+        self.__cursor.execute("""INSERT OR REPLACE INTO labels
+                            (id, name) VALUES (NULL, '')
+                            """)
+
+        self.__conn.commit()
 
     def get_images_hashes(self):
         self.__cursor.execute('SELECT hash FROM images')
@@ -78,15 +85,38 @@ class Controller:
 
         return locations
 
+    def get_label_ids(self) -> List[int]:
+        stmt = """SELECT id FROM labels"""
+        self.__cursor.execute(stmt)
+        return [x[0] for x in self.__cursor.fetchall()]
+
+    def drop_labels(self):
+        stmt = "DELETE FROM labels"
+        self.__cursor.execute(stmt)
+        self.__conn.commit()
+
     def add_images(self, images: List[Image]):
         params = [(img.hash, str(img.path)) for img in images]
-        self.__cursor.executemany("""INSERT INTO images(hash, path)
-                                    VALUES(?, ?)""", params)
+        self.__cursor.executemany("""INSERT INTO images (hash, path)
+                                    VALUES (?, ?)""", params)
         self.__conn.commit()
 
     def add_locations(self, locations: List[Location]):
         params = [(loc.image_hash, loc.label_id, loc.box, loc.encoding)
                   for loc in locations]
-        self.__cursor.executemany("""INSERT INTO locations(image_hash, label_id, box, encoding)
-                                    VALUES(?, ?, ?, ?)""", params)
+        self.__cursor.executemany("""INSERT INTO locations (image_hash, label_id, box, encoding)
+                                    VALUES (?, ?, ?, ?)""", params)
+        self.__conn.commit()
+
+    def add_labels(self, labels: List[Labels]):
+        params = [(label.id_, label.name) for label in labels]
+        self.__cursor.executemany("""INSERT INTO labels (id, name)
+                                    VALUES (?, ?)""", params)
+        self.__conn.commit()
+
+    def update_locations(self, locations: List[Location]):
+        params = [(loc.image_hash, loc.box, loc.encoding,
+                   loc.label_id, loc.id_) for loc in locations]
+        self.__cursor.executemany("""UPDATE locations SET image_hash = ?, box = ?, encoding = ?, label_id = ?
+                                WHERE id = ?""", params)
         self.__conn.commit()

@@ -1,5 +1,6 @@
 
 import hashlib
+import logging
 from pathlib import Path
 from typing import List
 
@@ -45,17 +46,20 @@ class Encoder:
         return hashes
 
     def encode_images(self, images_paths: List[Path]):
+        """Detect faces in images and exports its encodings
+
+        Args:
+            images_paths (List[Path]): list of paths to images to be encoded
+        """
         current_hashes = self.controller.get_images_hashes()
 
         df = pd.DataFrame(columns=['hash', 'path'])
 
         df['path'] = images_paths
         df['hash'] = self.get_images_hashes(images_paths)
+        df.drop_duplicates(subset='hash', inplace=True)
 
         new_images = df[~df['hash'].isin(current_hashes)]
-        locations = []
-        images = []
-
         for _, row in tqdm(new_images.iterrows(), total=len(new_images)):
             image = read_image(row['path'])
             rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -63,14 +67,14 @@ class Encoder:
                 rgb, model=DETECTION_METHOD)
 
             encodings = face_recognition.face_encodings(rgb, boxes)
-
+            locations = []
             for (box, enc) in zip(boxes, encodings):
                 location = Location(image_hash=row['hash'],
                                     box=','.join(map(str, box)),
                                     encoding=enc.tobytes())
                 locations.append(location)
 
-            images.append(Image(hash=row['hash'], path=row['path']))
+            image = Image(hash=row['hash'], path=row['path'])
 
-        self.controller.add_images(images)
-        self.controller.add_locations(locations)
+            self.controller.add_images([image])
+            self.controller.add_locations(locations)
